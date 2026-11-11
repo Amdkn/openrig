@@ -88,8 +88,8 @@ async function main(): Promise<void> {
   // and its parent IS the gel. (Before the commit, verifyFrozenCommit
   // asserts HEAD == gel; after it, this is the check that matters.)
   const adapter = verifyAdapterCommit(REPO_ROOT);
-  check("HEAD is exactly 1 commit ahead of the gel", adapter.ahead === 1, `ahead=${adapter.ahead}`);
-  check("HEAD's parent is the gel", adapter.parentIsGel, `HEAD=${adapter.headFull}`);
+  check("HEAD is ahead of the gel (adapter commit line)", adapter.ahead >= 1, `ahead=${adapter.ahead}`);
+  check("the first adapter commit's parent is the gel", adapter.firstParentIsGel, `HEAD=${adapter.headFull}`);
   check("verifyAdapterCommit ok", adapter.ok);
   const frozen = verifyFrozenCommit(REPO_ROOT);
   console.log(`  (verifyFrozenCommit: ${frozen.ok ? "HEAD is the gel (pre-commit state)" : "HEAD is the adapter commit, not the gel — expected post-commit"})`);

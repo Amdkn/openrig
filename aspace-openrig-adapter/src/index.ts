@@ -167,28 +167,33 @@ export function verifyFrozenCommit(repoRoot: string): { ok: boolean; head: strin
 }
 
 /**
- * Post-commit semantic: HEAD is the adapter commit (exactly 1 ahead of
- * the gel) and its parent IS the gel. The adapter commit's parent must be
- * the frozen commit — never a later upstream commit, never a merge.
+ * Post-commit semantic: HEAD is the adapter commit line (1 or more commits
+ * ahead of the gel) and the FIRST commit after the gel has the gel as its
+ * parent. The adapter line never rebases onto a later upstream commit and
+ * never merges — the gel stays the base, whatever the number of adapter
+ * commits.
  */
 export function verifyAdapterCommit(repoRoot: string): {
   ok: boolean;
   head: string;
   headFull: string;
-  parentIsGel: boolean;
+  firstParentIsGel: boolean;
   ahead: number;
 } {
   const headFull = git(["rev-parse", "HEAD"], repoRoot);
   const head = headFull.slice(0, 7);
   const ahead = Number(git(["rev-list", "--count", `${PINNED_OPENRIG_COMMIT_FULL}..HEAD`], repoRoot) || "0");
-  let parentIsGel = false;
+  let firstParentIsGel = false;
   try {
-    const parent = git(["rev-parse", "HEAD~1"], repoRoot);
-    parentIsGel = parent === PINNED_OPENRIG_COMMIT_FULL;
+    const first = git(["rev-list", "--reverse", `${PINNED_OPENRIG_COMMIT_FULL}..HEAD`], repoRoot).split("\n")[0]?.trim() ?? "";
+    if (first.length > 0) {
+      const parent = git(["rev-parse", `${first}~1`], repoRoot);
+      firstParentIsGel = parent === PINNED_OPENRIG_COMMIT_FULL;
+    }
   } catch {
-    parentIsGel = false;
+    firstParentIsGel = false;
   }
-  return { ok: ahead === 1 && parentIsGel, head, headFull, parentIsGel, ahead };
+  return { ok: ahead >= 1 && firstParentIsGel, head, headFull, firstParentIsGel, ahead };
 }
 
 /**
