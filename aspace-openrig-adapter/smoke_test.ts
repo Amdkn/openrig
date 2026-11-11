@@ -24,7 +24,6 @@ import {
   DAEMON_OUTBOUND_SITES,
   HERDR_SOCKET_METHODS,
   LineageScheduler,
-  PINNED_OPENRIG_COMMIT,
   PINNED_OPENRIG_COMMIT_FULL,
   PINNED_OPENRIG_VERSION,
   PINNED_SURFACE,
@@ -50,6 +49,7 @@ import {
   validateContextPackManifest,
   validateRigSpec,
   verifyFrozenCommit,
+  verifyAdapterCommit,
   verifyFrozenLineage,
 } from "./src/index.ts";
 
@@ -83,11 +83,16 @@ function throws(name: string, fn: () => unknown, detail = ""): void {
 async function main(): Promise<void> {
   console.log("== frozen commit (H-M2) ==");
   const info = getFrozenRepoInfo(REPO_ROOT);
-  check("HEAD is the gel (short)", info.headHash === PINNED_OPENRIG_COMMIT, `HEAD=${info.headHash}`);
-  check("HEAD is the gel (full)", info.headFull === PINNED_OPENRIG_COMMIT_FULL);
   check("branch is main", info.branch === "main", `branch=${info.branch}`);
+  // Post-commit semantic: HEAD is the adapter commit (1 ahead of the gel)
+  // and its parent IS the gel. (Before the commit, verifyFrozenCommit
+  // asserts HEAD == gel; after it, this is the check that matters.)
+  const adapter = verifyAdapterCommit(REPO_ROOT);
+  check("HEAD is exactly 1 commit ahead of the gel", adapter.ahead === 1, `ahead=${adapter.ahead}`);
+  check("HEAD's parent is the gel", adapter.parentIsGel, `HEAD=${adapter.headFull}`);
+  check("verifyAdapterCommit ok", adapter.ok);
   const frozen = verifyFrozenCommit(REPO_ROOT);
-  check("verifyFrozenCommit ok", frozen.ok && frozen.head === PINNED_OPENRIG_COMMIT_FULL);
+  console.log(`  (verifyFrozenCommit: ${frozen.ok ? "HEAD is the gel (pre-commit state)" : "HEAD is the adapter commit, not the gel — expected post-commit"})`);
   const lineage = verifyFrozenLineage(REPO_ROOT);
   check("gel is an ancestor of HEAD", lineage.gelAncestor);
   check("no non-adapter file changed since the gel", lineage.nonAdapterFiles.length === 0, lineage.nonAdapterFiles.join(", "));

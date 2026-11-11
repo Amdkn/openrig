@@ -52,8 +52,7 @@ import { readFileSync } from "node:fs";
 export { RIG_ROLES, RIG_RUNTIMES } from "./rig.ts";
 export type { Rig, Pod, RigNode, RigEdge, RigBinding, RigSession, ParsedRigSpec, RigSpecValidation } from "./rig.ts";
 export { validateRigSpec } from "./rig.ts";
-export { generateUlid, isUlid, LineageScheduler } from "./lineage.ts";
-export {
+export { generateUlid, isUlid, LineageScheduler } from "./lineage.ts";export {
   HERDR_SOCKET_METHODS,
   HERDR_DEFAULT_SOCKET,
   resolveHerdrSocketPath,
@@ -159,10 +158,37 @@ export function getFrozenRepoInfo(repoRoot: string): {
   };
 }
 
-/** Is the working tree's HEAD the frozen commit? */
+/** Is the working tree's HEAD the frozen commit? (Pre-commit semantic:
+ *  true only before the adapter commit is made. After the commit, use
+ *  `verifyAdapterCommit`.) */
 export function verifyFrozenCommit(repoRoot: string): { ok: boolean; head: string } {
   const head = git(["rev-parse", "HEAD"], repoRoot);
   return { ok: head === PINNED_OPENRIG_COMMIT_FULL, head };
+}
+
+/**
+ * Post-commit semantic: HEAD is the adapter commit (exactly 1 ahead of
+ * the gel) and its parent IS the gel. The adapter commit's parent must be
+ * the frozen commit — never a later upstream commit, never a merge.
+ */
+export function verifyAdapterCommit(repoRoot: string): {
+  ok: boolean;
+  head: string;
+  headFull: string;
+  parentIsGel: boolean;
+  ahead: number;
+} {
+  const headFull = git(["rev-parse", "HEAD"], repoRoot);
+  const head = headFull.slice(0, 7);
+  const ahead = Number(git(["rev-list", "--count", `${PINNED_OPENRIG_COMMIT_FULL}..HEAD`], repoRoot) || "0");
+  let parentIsGel = false;
+  try {
+    const parent = git(["rev-parse", "HEAD~1"], repoRoot);
+    parentIsGel = parent === PINNED_OPENRIG_COMMIT_FULL;
+  } catch {
+    parentIsGel = false;
+  }
+  return { ok: ahead === 1 && parentIsGel, head, headFull, parentIsGel, ahead };
 }
 
 /**
